@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Extra Payment Mortgage Calculator</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+:root{
+  --bg:#f4f7fb;
+  --card:#ffffff;
+  --primary:#2563eb;
+  --success:#16a34a;
+  --text:#0f172a;
+  --muted:#64748b;
+  --border:#e5e7eb;
+  --radius:16px;
+  --shadow:0 20px 40px rgba(0,0,0,.08);
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family:Inter,system-ui,Arial;
+  background:var(--bg);
+  color:var(--text);
+}
+.container{
+  max-width:1200px;
+  margin:auto;
+  padding:20px;
+}
+h1{
+  text-align:center;
+  color:var(--primary);
+  margin-bottom:24px;
+}
+.grid{
+  display:grid;
+  grid-template-columns:1fr 1.4fr;
+  gap:24px;
+}
+@media(max-width:900px){
+  .grid{grid-template-columns:1fr}
+}
+.card{
+  background:var(--card);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+  padding:24px;
+}
+label{
+  display:block;
+  margin-top:14px;
+  font-size:14px;
+}
+input,select{
+  width:100%;
+  padding:12px;
+  margin-top:6px;
+  border:1px solid var(--border);
+  border-radius:10px;
+  font-size:15px;
+}
+button{
+  width:100%;
+  padding:14px;
+  margin-top:16px;
+  border:none;
+  border-radius:12px;
+  font-size:16px;
+  cursor:pointer;
+}
+.primary{
+  background:var(--primary);
+  color:#fff;
+}
+.secondary{
+  background:#eef2ff;
+  color:var(--primary);
+}
+.stats{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:14px;
+}
+@media(max-width:900px){
+  .stats{grid-template-columns:1fr 1fr}
+}
+.stat{
+  background:#f8fafc;
+  padding:14px;
+  border-radius:12px;
+  text-align:center;
+}
+.stat h3{
+  margin:0;
+  font-size:20px;
+  color:var(--primary);
+}
+.stat p{
+  margin:4px 0 0;
+  font-size:13px;
+  color:var(--muted);
+}
+.highlight{
+  margin-top:14px;
+  padding:14px;
+  background:#dcfce7;
+  color:var(--success);
+  border-radius:12px;
+  text-align:center;
+  font-weight:600;
+}
+canvas{margin-top:24px}
+@media print{
+  body *{visibility:hidden}
+  #printArea, #printArea *{visibility:visible}
+  #printArea{position:absolute;top:0;left:0;width:100%}
+  button{display:none}
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+<h1>Extra Payment / Prepayment Impact Calculator</h1>
+
+<div class="grid">
+
+<!-- INPUT -->
+<div class="card">
+<label>Loan Amount</label>
+<input id="loan" value="250000">
+
+<label>Interest Rate (%)</label>
+<input id="rate" value="6.5">
+
+<label>Loan Term (Years)</label>
+<input id="years" value="30">
+
+<label>Extra Payment Amount</label>
+<input id="extra" value="200">
+
+<label>Extra Payment Frequency</label>
+<select id="frequency">
+  <option value="monthly">Monthly</option>
+  <option value="yearly">Yearly</option>
+</select>
+
+<label>Currency</label>
+<select id="currency">
+  <option value="$">USD ($)</option>
+  <option value="€">EUR (€)</option>
+  <option value="£">GBP (£)</option>
+  <option value="₹">INR (₹)</option>
+</select>
+
+<button class="primary" onclick="calculate()">Calculate Impact</button>
+<button class="secondary" onclick="clearAll()">Clear</button>
+</div>
+
+<!-- OUTPUT -->
+<div class="card" id="printArea">
+
+<div class="stats">
+  <div class="stat"><h3 id="origInterest">—</h3><p>Original Interest</p></div>
+  <div class="stat"><h3 id="newInterest">—</h3><p>Interest With Extra</p></div>
+  <div class="stat"><h3 id="saved">—</h3><p>Interest Saved</p></div>
+  <div class="stat"><h3 id="timeSaved">—</h3><p>Time Saved</p></div>
+</div>
+
+<div id="message" class="highlight"></div>
+
+<canvas id="chart"></canvas>
+
+<button class="secondary" onclick="window.print()">Print Report</button>
+
+</div>
+</div>
+</div>
+
+<script>
+let chart;
+
+function fmt(v){
+  return currency.value + Math.round(v).toLocaleString();
+}
+
+function calculate(){
+  const P = +loan.value;
+  const r = +rate.value / 100 / 12;
+  const n = +years.value * 12;
+  const extraPay = +extra.value;
+  const freq = frequency.value;
+
+  const emi = P * r * Math.pow(1+r,n) / (Math.pow(1+r,n)-1);
+
+  let balance = P, totalInt = 0, m = 0;
+  let balNormal = P, intNormal = 0;
+
+  for(let i=1;i<=n;i++){
+    const int = balNormal*r;
+    balNormal -= (emi-int);
+    intNormal += int;
+  }
+
+  while(balance>0){
+    const int = balance*r;
+    let payment = emi + (freq==="monthly"?extraPay:0);
+    if(freq==="yearly" && m%12===0) payment+=extraPay;
+    balance -= (payment-int);
+    totalInt += int;
+    m++;
+    if(m>1000) break;
+  }
+
+  const savedInt = intNormal - totalInt;
+  const monthsSaved = n - m;
+
+  origInterest.innerText = fmt(intNormal);
+  newInterest.innerText = fmt(totalInt);
+  saved.innerText = fmt(savedInt);
+  timeSaved.innerText = Math.floor(monthsSaved/12)+"y "+(monthsSaved%12)+"m";
+
+  message.innerText =
+    "You can save " + fmt(savedInt) +
+    " and pay off your loan " +
+    Math.floor(monthsSaved/12) + " years earlier.";
+
+  if(chart)chart.destroy();
+  chart = new Chart(chart,{
+    type:"bar",
+    data:{
+      labels:["Without Extra","With Extra"],
+      datasets:[{
+        label:"Total Interest",
+        data:[intNormal,totalInt],
+        backgroundColor:["#dc2626","#16a34a"]
+      }]
+    }
+  });
+}
+
+function clearAll(){
+  document.querySelectorAll("input").forEach(i=>i.value="");
+  document.querySelectorAll(".stat h3").forEach(e=>e.innerText="—");
+  message.innerText="";
+  if(chart)chart.destroy();
+}
+</script>
+</body>
+</html>
